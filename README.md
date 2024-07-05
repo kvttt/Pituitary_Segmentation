@@ -25,13 +25,14 @@ Check out ANTs' [official repository](https://github.com/ANTsX/ANTs) for instruc
 ```
 Atlas-based pituitary segmentation using ANTs.
 
-Usage: ./pituitary_segmentation.sh <input> <output> [-t transform] [-c] [-n] [-h]
+Usage: ./pituitary_segmentation.sh <input> <output> [-t transform] [-c cutoff] [-m threads] [-n] [-h]
 
 Options:
   <input>         Input image filename.
   <output>        Output image filename.
-  -t transform    Type of transform to use in registration. Default: Affine.
+  -t transform    Type of transform to use in registration. Default: Affine. Currently supported: Affine, SyN, SyNQuick.
   -c cutoff       Cutoff value for the mask. Default: 5.
+  -m threads      Number of threads to use. Default: 1. Increase this value to speed up the registration process.
   -n              Apply N4 bias correction to the input image.
   -h              Display this help message.
 ```
