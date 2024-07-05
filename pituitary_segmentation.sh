@@ -5,6 +5,7 @@ args=()
 transform="Affine"
 cutoff=5
 n4=false
+threads=1
 
 atlases=("atlas_001.nii.gz" "atlas_002.nii.gz" "atlas_003.nii.gz" "atlas_004.nii.gz" "atlas_005.nii.gz" "atlas_006.nii.gz" "atlas_007.nii.gz" "atlas_008.nii.gz" "atlas_009.nii.gz" "atlas_010.nii.gz")
 masks=("mask_001.nii.gz" "mask_002.nii.gz" "mask_003.nii.gz" "mask_004.nii.gz" "mask_005.nii.gz" "mask_006.nii.gz" "mask_007.nii.gz" "mask_008.nii.gz" "mask_009.nii.gz" "mask_010.nii.gz")
@@ -13,13 +14,14 @@ usage() {
     echo
     echo "Atlas-based pituitary segmentation using ANTs."
     echo
-    echo "Usage: $0 <input> <output> [-t transform] [-c] [-n] [-h]"
+    echo "Usage: $0 <input> <output> [-t transform] [-c cutoff] [-m threads] [-n] [-h]"
     echo
     echo "Options:"
     echo "  <input>         Input image filename."
     echo "  <output>        Output image filename."
     echo "  -t transform    Type of transform to use in registration. Default: Affine. Currently supported: Affine, SyN, SyNQuick."
     echo "  -c cutoff       Cutoff value for the mask. Default: 5."
+    echo "  -m threads      Number of threads to use. Default: 1. Increase this value to speed up the registration process."
     echo "  -n              Apply N4 bias correction to the input image."
     echo "  -h              Display this help message."
     echo
@@ -28,12 +30,13 @@ usage() {
 
 while [ $OPTIND -le "$#" ]
 do
-    if getopts t:c:nh option
+    if getopts t:c:m:nh option
     then
         case $option
         in
             t) transform="$OPTARG";;
             c) cutoff="$OPTARG";;
+            m) threads="$OPTARG";;
             n) n4=true;;
             h) usage;;
         esac
@@ -63,14 +66,18 @@ then
     exit 1
 fi
 
+if [ "$threads" -lt 1 ]
+then
+    echo "Number of threads must be at least 1. Exiting..."
+    exit 1
+fi
+
 echo "Transform: $transform"
 echo "N4: $n4"
 echo "Cutoff: $cutoff"
+echo "Threads: $threads"
 echo "Input filename: ${args[0]}"
 echo "Output filename: ${args[1]}"
-echo
-echo "Default number of threads: $ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"
-echo "For speedup, consider changing the environment variable ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS."
 
 # optional N4 bias correction
 if [ "$n4" = true ]
@@ -91,15 +98,15 @@ do
     if [ "$transform" = "Affine" ]
     then
         echo "Performing affine registration..."
-        antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t a
+        antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t a -n "$threads"
     elif [ "$transform" = "SyN" ]
     then
         echo "Performing deformable registration (SyN)..."
-        antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t s
+        antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t s -n "$threads"
     elif [ "$transform" = "SyNQuick" ]
     then
         echo "Performing deformable registration (SyNQuick)..."
-        antsRegistrationSyNQuick.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t s
+        antsRegistrationSyNQuick.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t s -n "$threads"
     else
         echo "Unsupported transform type. Exiting..."
         exit 1
