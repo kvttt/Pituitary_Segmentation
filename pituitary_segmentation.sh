@@ -28,6 +28,11 @@ usage() {
     exit 0
 }
 
+if [ "$#" -lt 2 ]
+then
+    usage
+fi
+
 while [ $OPTIND -le "$#" ]
 do
     if getopts t:c:m:nh option
