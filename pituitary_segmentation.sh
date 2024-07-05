@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 # pituitary_segmentation.sh - command line tool for pituitary segmentation based on ANTs
 
 args=()
@@ -18,7 +18,7 @@ usage() {
     echo "Options:"
     echo "  <input>         Input image filename."
     echo "  <output>        Output image filename."
-    echo "  -t transform    Type of transform to use in registration. Default: Affine."
+    echo "  -t transform    Type of transform to use in registration. Default: Affine. Currently supported: Affine, SyN, SyNQuick."
     echo "  -c cutoff       Cutoff value for the mask. Default: 5."
     echo "  -n              Apply N4 bias correction to the input image."
     echo "  -h              Display this help message."
@@ -43,10 +43,34 @@ do
     fi
 done
 
+if [ "$transform" != "Affine" ] && [ "$transform" != "SyN" ] && [ "$transform" != "SyNQuick" ]
+then
+    echo "Unsupported transform type $transform. Exiting..."
+    exit 1
+fi
+
+if [ "$cutoff" -lt 0 ]
+then
+    echo "Cutoff value must be non-negative. Exiting..."
+    exit 1
+elif [ "$cutoff" -eq 0 ]
+then
+    echo "Cutoff value of 0 will result in an empty mask. Exiting..."
+    exit 1
+elif [ "$cutoff" -gt 10 ]
+then
+    echo "Cutoff value must be less than or equal to 10. Exiting..."
+    exit 1
+fi
+
 echo "Transform: $transform"
 echo "N4: $n4"
+echo "Cutoff: $cutoff"
 echo "Input filename: ${args[0]}"
 echo "Output filename: ${args[1]}"
+echo
+echo "Default number of threads: $ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS"
+echo "For speedup, consider changing the environment variable ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS."
 
 # optional N4 bias correction
 if [ "$n4" = true ]
@@ -63,7 +87,24 @@ fi
 for i in {0..9}
 do
     echo "Registering atlas ${atlases[$i]} to the input image..."
-    antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_"
+    
+    if [ "$transform" = "Affine" ]
+    then
+        echo "Performing affine registration..."
+        antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t a
+    elif [ "$transform" = "SyN" ]
+    then
+        echo "Performing deformable registration (SyN)..."
+        antsRegistrationSyN.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t s
+    elif [ "$transform" = "SyNQuick" ]
+    then
+        echo "Performing deformable registration (SyNQuick)..."
+        antsRegistrationSyNQuick.sh -d 3 -f "${input}" -m "${atlases[$i]}" -o "${input%.nii.gz}_atlas_${i}_" -t s
+    else
+        echo "Unsupported transform type. Exiting..."
+        exit 1
+    fi
+
     echo "Applying transformation to the mask ${masks[$i]}..."
     antsApplyTransforms -d 3 -i "${masks[$i]}" -r "${input}" -o "${input%.nii.gz}_mask_${i}.nii.gz" -n NearestNeighbor -t "${input%.nii.gz}_atlas_${i}_0GenericAffine.mat"
 done
